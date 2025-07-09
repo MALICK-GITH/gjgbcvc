@@ -586,16 +586,16 @@ def match_details(match_id):
                             const data1 = data.stats.map(s => parseFloat(s.s1.replace(',', '.')) || 0);
                             const data2 = data.stats.map(s => parseFloat(s.s2.replace(',', '.')) || 0);
                             window.statsChart = new Chart(document.getElementById('statsChart'), {{
-                                type: 'bar',
-                                data: {{
-                                    labels: labels,
-                                    datasets: [
+                    type: 'bar',
+                    data: {{
+                        labels: labels,
+                        datasets: [
                                         {{ label: data.team1, data: data1, backgroundColor: 'rgba(44,62,80,0.7)' }},
                                         {{ label: data.team2, data: data2, backgroundColor: 'rgba(39,174,96,0.7)' }}
-                                    ]
-                                }},
-                                options: {{ responsive: true, plugins: {{ legend: {{ position: 'top' }} }} }}
-                            }});
+                        ]
+                    }},
+                    options: {{ responsive: true, plugins: {{ legend: {{ position: 'top' }} }} }}
+                }});
                         }});
                 }}
                 setInterval(updateMatchDetails, 5000); // 5 secondes
