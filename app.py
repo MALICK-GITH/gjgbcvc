@@ -99,6 +99,34 @@ def get_prediction(match: dict, team1: str, team2: str) -> str:
         return "Match nul"
     return "–"
 
+def traduire_pari(groupe, t, param, team1, team2):
+    # Paris principaux 1X2
+    if groupe == 1:
+        if t == 1:
+            return f"Victoire {team1}"
+        elif t == 2:
+            return f"Victoire {team2}"
+        elif t == 3:
+            return "Match nul"
+        elif t == 4:
+            return f"Victoire {team1} ou Nul"
+        elif t == 5:
+            return f"Victoire {team2} ou Nul"
+        elif t == 6:
+            return f"Victoire {team1} ou {team2}"
+    # Over/Under
+    if groupe == 2:
+        if t == 7:
+            return f"Plus de {param} buts"
+        elif t == 8:
+            return f"Moins de {param} buts"
+        elif t == 9:
+            return f"Handicap {team1} +{param}"
+        elif t == 10:
+            return f"Handicap {team2} -{param}"
+    # Autres types courants (à compléter selon besoins)
+    return f"Type {t} (groupe {groupe})"
+
 def get_all_predictions(match: dict, team1: str, team2: str) -> list:
     predictions = []
     # Cotes principales (E)
@@ -106,18 +134,9 @@ def get_all_predictions(match: dict, team1: str, team2: str) -> list:
         cote = o.get("C")
         if cote is not None and 1.399 <= cote <= 3:
             t = o.get("T")
+            groupe = o.get("G")
             param = o.get("P") if "P" in o else None
-            if o.get("G") == 1 and t in [1, 2, 3]:
-                if t == 1:
-                    label = f"Victoire {team1}"
-                elif t == 2:
-                    label = f"Victoire {team2}"
-                elif t == 3:
-                    label = "Match nul"
-                else:
-                    label = "Autre"
-            else:
-                label = f"Type {t}"
+            label = traduire_pari(groupe, t, param, team1, team2)
             predictions.append({"resultat": label, "param": param if param not in [None, -1.0] else "", "cote": cote})
     # Cotes alternatives (AE/ME)
     for ae in match.get("AE", []):
@@ -127,19 +146,31 @@ def get_all_predictions(match: dict, team1: str, team2: str) -> list:
             if cote is not None and 1.399 <= cote <= 3:
                 t = o.get("T")
                 param = o.get("P") if "P" in o else None
-                # Libellé explicite selon le type de pari (exemples courants)
-                if groupe == 2 and t in [7, 8]:
-                    # Over/Under
-                    label = "Over" if t == 7 else "Under"
-                elif groupe == 2 and t in [9, 10]:
-                    # Handicap
-                    label = "Handicap +" if t == 9 else "Handicap -"
-                else:
-                    label = f"Type {t} (alt)"
+                label = traduire_pari(groupe, t, param, team1, team2)
                 predictions.append({"resultat": label, "param": param if param not in [None, -1.0] else "", "cote": cote})
     # Tri par cote croissante
     predictions.sort(key=lambda x: x["cote"])
     return predictions
+
+def get_alternative_prediction(match: dict, team1: str, team2: str) -> str:
+    meilleures = []
+    for ae in match.get("AE", []):
+        groupe = ae.get("G")
+        for o in ae.get("ME", []):
+            cote = o.get("C")
+            if cote is not None and 1.399 <= cote <= 3:
+                t = o.get("T")
+                param = o.get("P") if "P" in o else None
+                label = traduire_pari(groupe, t, param, team1, team2)
+                meilleures.append((cote, label, param))
+    if meilleures:
+        meilleures.sort(key=lambda x: x[0])
+        cote, label, param = meilleures[0]
+        if param not in [None, -1.0, ""]:
+            return f"{label} ({param}) [{cote}]"
+        else:
+            return f"{label} [{cote}]"
+    return "Aucune cote alternative dans la plage (1.399 à 3)"
 
 def parse_meteo(match: dict) -> Tuple[str, str]:
     meteo_data = match.get("MIS", [])
@@ -310,10 +341,9 @@ def api_match_details(match_id):
                 s1 = stat.get("S1", "0")
                 s2 = stat.get("S2", "0")
                 stats.append({"nom": nom, "s1": s1, "s2": s2})
-        explication = "La prédiction est basée sur toutes les cotes principales et alternatives comprises entre 1.399 et 3."
-        odds_data = parse_odds(match)
-        prediction = get_prediction(match, team1, team2)
+        explication = "Toutes les opportunités de pari (alternatives uniquement) comprises entre 1.399 et 3 sont listées ci-dessous, avec leur libellé explicite."
         all_predictions = get_all_predictions(match, team1, team2)
+        alt_prediction = get_alternative_prediction(match, team1, team2)
         return jsonify({
             "team1": team1,
             "team2": team2,
@@ -326,8 +356,8 @@ def api_match_details(match_id):
             "score2": score2,
             "stats": stats,
             "explication": explication,
-            "prediction": prediction,
-            "all_predictions": all_predictions
+            "all_predictions": all_predictions,
+            "alt_prediction": alt_prediction
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -358,10 +388,9 @@ def match_details(match_id):
                 s1 = stat.get("S1", "0")
                 s2 = stat.get("S2", "0")
                 stats.append({"nom": nom, "s1": s1, "s2": s2})
-        explication = "La prédiction est basée sur toutes les cotes principales et alternatives comprises entre 1.399 et 3."
-        odds_data = parse_odds(match)
-        prediction = get_prediction(match, team1, team2)
+        explication = "Toutes les opportunités de pari (alternatives uniquement) comprises entre 1.399 et 3 sont listées ci-dessous, avec leur libellé explicite."
         all_predictions = get_all_predictions(match, team1, team2)
+        alt_prediction = get_alternative_prediction(match, team1, team2)
         return f'''
         <!DOCTYPE html>
         <html><head>
@@ -392,7 +421,7 @@ def match_details(match_id):
                         {''.join(f'<tr><td>{{p["resultat"]}}</td><td>{{p["param"]}}</td><td>{{p["cote"]}}</td></tr>' for p in all_predictions)}
                     </table>
                 </div>
-                <p id="prediction"><b>Prédiction du bot :</b> {prediction}</p>
+                <p id="alt-prediction"><b>Prédiction du bot (alternatif) :</b> {alt_prediction}</p>
                 <p id="explication"><b>Explication :</b> {explication}</p>
                 <h3>Statistiques principales</h3>
                 <table class="stats-table">
@@ -419,7 +448,7 @@ def match_details(match_id):
                                 predRows += `<tr><td>${{p.resultat}}</td><td>${{p.param}}</td><td>${{p.cote}}</td></tr>`;
                             }});
                             predTable.innerHTML = predRows;
-                            document.getElementById('prediction').innerHTML = `<b>Prédiction du bot :</b> ${{data.prediction}}`;
+                            document.getElementById('alt-prediction').innerHTML = `<b>Prédiction du bot (alternatif) :</b> ${{data.alt_prediction}}`;
                             document.getElementById('explication').innerHTML = `<b>Explication :</b> ${{data.explication}}`;
                             // Update stats table
                             const statsTbody = document.getElementById('stats-tbody');
