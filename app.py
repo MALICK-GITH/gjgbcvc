@@ -524,7 +524,7 @@ def match_details(match_id):
                     <h4 style="margin-top:10px;">Tableau des alternatives (Handicap & Over/Under, cotes 1.399 à 3)</h4>
                     <table class="alt-prediction-table" id="alt-prediction-table">
                         <tr><th>Type de pari</th><th>Cote</th><th>Probabilité estimée</th></tr>
-                        {''.join(f'<tr class="alt-prediction-best">' if i==0 else '<tr>' + f'<td>{{p["resultat"]}}</td><td>{{p["cote"]}}</td><td>{{round(1/float(p["cote"]),3) if p["cote"] else "-"}}</td></tr>' for i,p in enumerate([pp for pp in all_predictions if any(x in pp["resultat"].lower() for x in ["handicap", "plus de", "moins de", "asiatique"])]) )}
+                        {''.join(f'<tr class="alt-prediction-best">' if i==0 else '<tr>' + f'<td>{{p["resultat"]}}</td><td>{{p["cote"]}}</td><td>{{round(1/float(p["cote"]),3) if p.get("cote") else "-"}}</td></tr>' for i,p in enumerate([pp for pp in all_predictions if any(x in pp["resultat"].lower() for x in ["handicap", "plus de", "moins de", "asiatique"])]) )}
                     </table>
                 </div>
                 <div id="predictions" class="pred-section">
@@ -566,9 +566,9 @@ def match_details(match_id):
                                 if (p.resultat.toLowerCase().includes('handicap') || p.resultat.toLowerCase().includes('plus de') || p.resultat.toLowerCase().includes('moins de') || p.resultat.toLowerCase().includes('asiatique')) {
                                     let row = '<tr>';
                                     if (p.resultat.toLowerCase().includes('handicap')) {
-                                        row += `<td>${{p.resultat}}</td><td>${{p.cote}}</td><td>${{round(1/float(p.cote),3) if p.cote else "-"}}</td></tr>`;
+                                        row += `<td>${{p.resultat}}</td><td>${{p.cote}}</td><td>${{round(1/float(p.cote),3) if p.get("cote") else "-"}}</td></tr>`;
                                     } else {
-                                        row += `<td>${{p.resultat}}</td><td>${{p.cote}}</td><td>${{round(1/float(p.cote),3) if p.cote else "-"}}</td></tr>`;
+                                        row += `<td>${{p.resultat}}</td><td>${{p.cote}}</td><td>${{round(1/float(p.cote),3) if p.get("cote") else "-"}}</td></tr>`;
                                     }
                                     predTable.insertAdjacentHTML('beforeend', row);
                                 }
