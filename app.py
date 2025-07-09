@@ -8,21 +8,13 @@ from typing import List, Optional, Dict, Any, Tuple
 app = Flask(__name__)
 
 @dataclass
-class Odds:
-    type: str
-    cote: float
-
-@dataclass
 class MatchData:
     team1: str
     team2: str
     score1: int
     score2: int
     league: str
-    league_name: str
-    league_country: str
     sport: str
-    sport_name: str
     status: str
     datetime: str
     temp: str
@@ -30,10 +22,6 @@ class MatchData:
     odds: List[str]
     prediction: str
     id: Optional[int]
-    event_type: Optional[int]
-    match_status: Optional[int]
-    time_name: str
-    time_name_en: str
 
 # --- Fonctions utilitaires ---
 def detect_sport(league_name: str) -> str:
@@ -86,28 +74,72 @@ def parse_status(match: dict, minute: Optional[int], score1: int, score2: int) -
         is_upcoming = True
     return {"statut": statut, "is_live": is_live, "is_finished": is_finished, "is_upcoming": is_upcoming}
 
-def parse_odds(match: dict) -> List[Odds]:
+def parse_odds(match: dict) -> List[str]:
     odds_data = []
     for o in match.get("E", []):
         if o.get("G") == 1 and o.get("T") in [1, 2, 3] and o.get("C") is not None:
-            odds_data.append(Odds(type={1: "1", 2: "2", 3: "X"}.get(o.get("T"), "-"), cote=o.get("C")))
+            odds_data.append(f"{ {1: '1', 2: '2', 3: 'X'}[o.get('T')] }: {o.get('C')}")
     if not odds_data:
-        for ae in match.get("AE", []):
-            if ae.get("G") == 1:
-                for o in ae.get("ME", []):
-                    if o.get("T") in [1, 2, 3] and o.get("C") is not None:
-                        odds_data.append(Odds(type={1: "1", 2: "2", 3: "X"}.get(o.get("T"), "-"), cote=o.get("C")))
+        odds_data = ["Pas de cotes disponibles"]
     return odds_data
 
-def get_prediction(odds_data: List[Odds], team1: str, team2: str) -> str:
-    if not odds_data:
-        return "–"
-    best = min(odds_data, key=lambda x: x.cote)
-    return {
-        "1": f"{team1} gagne",
-        "2": f"{team2} gagne",
-        "X": "Match nul"
-    }.get(best.type, "–")
+def get_prediction(match: dict, team1: str, team2: str) -> str:
+    best = None
+    best_type = None
+    for o in match.get("E", []):
+        if o.get("G") == 1 and o.get("T") in [1, 2, 3] and o.get("C") is not None:
+            if best is None or o.get("C") < best:
+                best = o.get("C")
+                best_type = o.get("T")
+    if best_type == 1:
+        return f"{team1} gagne"
+    elif best_type == 2:
+        return f"{team2} gagne"
+    elif best_type == 3:
+        return "Match nul"
+    return "–"
+
+def get_all_predictions(match: dict, team1: str, team2: str) -> list:
+    predictions = []
+    # Cotes principales (E)
+    for o in match.get("E", []):
+        cote = o.get("C")
+        if cote is not None and 1.399 <= cote <= 3:
+            t = o.get("T")
+            param = o.get("P") if "P" in o else None
+            if o.get("G") == 1 and t in [1, 2, 3]:
+                if t == 1:
+                    label = f"Victoire {team1}"
+                elif t == 2:
+                    label = f"Victoire {team2}"
+                elif t == 3:
+                    label = "Match nul"
+                else:
+                    label = "Autre"
+            else:
+                label = f"Type {t}"
+            predictions.append({"resultat": label, "param": param if param not in [None, -1.0] else "", "cote": cote})
+    # Cotes alternatives (AE/ME)
+    for ae in match.get("AE", []):
+        groupe = ae.get("G")
+        for o in ae.get("ME", []):
+            cote = o.get("C")
+            if cote is not None and 1.399 <= cote <= 3:
+                t = o.get("T")
+                param = o.get("P") if "P" in o else None
+                # Libellé explicite selon le type de pari (exemples courants)
+                if groupe == 2 and t in [7, 8]:
+                    # Over/Under
+                    label = "Over" if t == 7 else "Under"
+                elif groupe == 2 and t in [9, 10]:
+                    # Handicap
+                    label = "Handicap +" if t == 9 else "Handicap -"
+                else:
+                    label = f"Type {t} (alt)"
+                predictions.append({"resultat": label, "param": param if param not in [None, -1.0] else "", "cote": cote})
+    # Tri par cote croissante
+    predictions.sort(key=lambda x: x["cote"])
+    return predictions
 
 def parse_meteo(match: dict) -> Tuple[str, str]:
     meteo_data = match.get("MIS", [])
@@ -117,47 +149,32 @@ def parse_meteo(match: dict) -> Tuple[str, str]:
 
 def parse_match(match: dict) -> MatchData:
     league = match.get("LE", "–")
-    league_name = match.get("CN", "–")
-    league_country = match.get("CE", "–")
     team1 = match.get("O1", "–")
     team2 = match.get("O2", "–")
     sport = detect_sport(league).strip()
-    sport_name = match.get("SN", match.get("SE", sport))
     score1 = parse_score(match.get("SC", {}).get("FS", {}).get("S1"))
     score2 = parse_score(match.get("SC", {}).get("FS", {}).get("S2"))
     minute = parse_minute(match)
     status_info = parse_status(match, minute, score1, score2)
     match_ts = match.get("S", 0)
     match_time = datetime.datetime.utcfromtimestamp(match_ts).strftime('%d/%m/%Y %H:%M') if match_ts else "–"
-    odds_data = parse_odds(match)
-    formatted_odds = [f"{od.type}: {od.cote}" for od in odds_data] if odds_data else ["Pas de cotes disponibles"]
-    prediction = get_prediction(odds_data, team1, team2)
+    odds = parse_odds(match)
+    prediction = get_prediction(match, team1, team2)
     temp, humid = parse_meteo(match)
-    event_type = match.get("T")
-    match_status = match.get("HS")
-    time_name = match.get("TN", "–")
-    time_name_en = match.get("TNS", "–")
     return MatchData(
         team1=team1,
         team2=team2,
         score1=score1,
         score2=score2,
         league=league,
-        league_name=league_name,
-        league_country=league_country,
         sport=sport,
-        sport_name=sport_name,
         status=status_info["statut"],
         datetime=match_time,
         temp=temp,
         humid=humid,
-        odds=formatted_odds,
+        odds=odds,
         prediction=prediction,
-        id=match.get("I", None),
-        event_type=event_type,
-        match_status=match_status,
-        time_name=time_name,
-        time_name_en=time_name_en
+        id=match.get("I", None)
     )
 
 @app.route('/')
@@ -293,9 +310,10 @@ def api_match_details(match_id):
                 s1 = stat.get("S1", "0")
                 s2 = stat.get("S2", "0")
                 stats.append({"nom": nom, "s1": s1, "s2": s2})
-        explication = "La prédiction est basée sur les cotes et les statistiques principales (tirs, possession, etc.)."
+        explication = "La prédiction est basée sur toutes les cotes principales et alternatives comprises entre 1.399 et 3."
         odds_data = parse_odds(match)
-        prediction = get_prediction(odds_data, team1, team2)
+        prediction = get_prediction(match, team1, team2)
+        all_predictions = get_all_predictions(match, team1, team2)
         return jsonify({
             "team1": team1,
             "team2": team2,
@@ -308,7 +326,8 @@ def api_match_details(match_id):
             "score2": score2,
             "stats": stats,
             "explication": explication,
-            "prediction": prediction
+            "prediction": prediction,
+            "all_predictions": all_predictions
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -339,9 +358,10 @@ def match_details(match_id):
                 s1 = stat.get("S1", "0")
                 s2 = stat.get("S2", "0")
                 stats.append({"nom": nom, "s1": s1, "s2": s2})
-        explication = "La prédiction est basée sur les cotes et les statistiques principales (tirs, possession, etc.)."
+        explication = "La prédiction est basée sur toutes les cotes principales et alternatives comprises entre 1.399 et 3."
         odds_data = parse_odds(match)
-        prediction = get_prediction(odds_data, team1, team2)
+        prediction = get_prediction(match, team1, team2)
+        all_predictions = get_all_predictions(match, team1, team2)
         return f'''
         <!DOCTYPE html>
         <html><head>
@@ -356,6 +376,8 @@ def match_details(match_id):
                 .stats-table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
                 .stats-table th, .stats-table td {{ border: 1px solid #ccc; padding: 8px; text-align: center; }}
                 .back-btn {{ margin-bottom: 20px; display: inline-block; }}
+                .pred-table {{ width: 90%; margin: 20px auto 0 auto; border-collapse: collapse; }}
+                .pred-table th, .pred-table td {{ border: 1px solid #aaa; padding: 6px; text-align: center; }}
             </style>
         </head><body>
             <div class="container">
@@ -363,52 +385,66 @@ def match_details(match_id):
                 <h2 id="teams">{team1} vs {team2}</h2>
                 <p id="infos"><b>Ligue :</b> {league_name} ({league}) | <b>Pays :</b> {league_country} | <b>Sport :</b> {sport_name}</p>
                 <p id="score"><b>Score :</b> {score1} - {score2}</p>
+                <div id="predictions">
+                    <h3>Prédictions principales et alternatives (cotes 1.399 à 3)</h3>
+                    <table class="pred-table" id="pred-table">
+                        <tr><th>Pari/prédiction</th><th>Paramètre</th><th>Cote</th></tr>
+                        {''.join(f'<tr><td>{{p["resultat"]}}</td><td>{{p["param"]}}</td><td>{{p["cote"]}}</td></tr>' for p in all_predictions)}
+                    </table>
+                </div>
                 <p id="prediction"><b>Prédiction du bot :</b> {prediction}</p>
                 <p id="explication"><b>Explication :</b> {explication}</p>
                 <h3>Statistiques principales</h3>
                 <table class="stats-table">
                     <tr><th>Statistique</th><th>{team1}</th><th>{team2}</th></tr>
                     <tbody id="stats-tbody">
-                    {''.join(f'<tr><td>{s["nom"]}</td><td>{s["s1"]}</td><td>{s["s2"]}</td></tr>' for s in stats)}
+                    {''.join(f'<tr><td>{{s["nom"]}}</td><td>{{s["s1"]}}</td><td>{{s["s2"]}}</td></tr>' for s in stats)}
                     </tbody>
                 </table>
                 <canvas id="statsChart" height="200"></canvas>
             </div>
             <script>
-                function updateMatchDetails() {
+                function updateMatchDetails() {{
                     fetch(window.location.pathname.replace('/match/', '/api/match/'))
                         .then(response => response.json())
-                        .then(data => {
+                        .then(data => {{
                             if(data.error) return;
                             document.getElementById('teams').textContent = data.team1 + ' vs ' + data.team2;
-                            document.getElementById('infos').innerHTML = `<b>Ligue :</b> ${data.league_name} (${data.league}) | <b>Pays :</b> ${data.league_country} | <b>Sport :</b> ${data.sport_name}`;
-                            document.getElementById('score').innerHTML = `<b>Score :</b> ${data.score1} - ${data.score2}`;
-                            document.getElementById('prediction').innerHTML = `<b>Prédiction du bot :</b> ${data.prediction}`;
-                            document.getElementById('explication').innerHTML = `<b>Explication :</b> ${data.explication}`;
+                            document.getElementById('infos').innerHTML = `<b>Ligue :</b> ${{data.league_name}} (${{data.league}}) | <b>Pays :</b> ${{data.league_country}} | <b>Sport :</b> ${{data.sport_name}}`;
+                            document.getElementById('score').innerHTML = `<b>Score :</b> ${{data.score1}} - ${{data.score2}}`;
+                            // Prédictions principales et alternatives
+                            const predTable = document.getElementById('pred-table');
+                            let predRows = '<tr><th>Pari/prédiction</th><th>Paramètre</th><th>Cote</th></tr>';
+                            data.all_predictions.forEach(function(p) {{
+                                predRows += `<tr><td>${{p.resultat}}</td><td>${{p.param}}</td><td>${{p.cote}}</td></tr>`;
+                            }});
+                            predTable.innerHTML = predRows;
+                            document.getElementById('prediction').innerHTML = `<b>Prédiction du bot :</b> ${{data.prediction}}`;
+                            document.getElementById('explication').innerHTML = `<b>Explication :</b> ${{data.explication}}`;
                             // Update stats table
                             const statsTbody = document.getElementById('stats-tbody');
                             statsTbody.innerHTML = '';
-                            data.stats.forEach(function(s) {
-                                statsTbody.innerHTML += `<tr><td>${s.nom}</td><td>${s.s1}</td><td>${s.s2}</td></tr>`;
-                            });
+                            data.stats.forEach(function(s) {{
+                                statsTbody.innerHTML += `<tr><td>${{s.nom}}</td><td>${{s.s1}}</td><td>${{s.s2}}</td></tr>`;
+                            }});
                             // Update chart
                             if(window.statsChart) window.statsChart.destroy();
                             const labels = data.stats.map(s => s.nom);
                             const data1 = data.stats.map(s => parseFloat(s.s1.replace(',', '.')) || 0);
                             const data2 = data.stats.map(s => parseFloat(s.s2.replace(',', '.')) || 0);
-                            window.statsChart = new Chart(document.getElementById('statsChart'), {
+                            window.statsChart = new Chart(document.getElementById('statsChart'), {{
                                 type: 'bar',
-                                data: {
+                                data: {{
                                     labels: labels,
                                     datasets: [
-                                        { label: data.team1, data: data1, backgroundColor: 'rgba(44,62,80,0.7)' },
-                                        { label: data.team2, data: data2, backgroundColor: 'rgba(39,174,96,0.7)' }
+                                        {{ label: data.team1, data: data1, backgroundColor: 'rgba(44,62,80,0.7)' }},
+                                        {{ label: data.team2, data: data2, backgroundColor: 'rgba(39,174,96,0.7)' }}
                                     ]
-                                },
-                                options: { responsive: true, plugins: { legend: { position: 'top' } } }
-                            });
-                        });
-                }
+                                }},
+                                options: {{ responsive: true, plugins: {{ legend: {{ position: 'top' }} }} }}
+                            }});
+                        }});
+                }}
                 setInterval(updateMatchDetails, 20000); // 20 secondes
             </script>
         </body></html>
