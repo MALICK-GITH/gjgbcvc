@@ -219,15 +219,13 @@ def get_alternative_prediction(match: dict, team1: str, team2: str) -> str:
     if meilleures:
         meilleures.sort(key=lambda x: x[0])
         cote, label, param, groupe, t = meilleures[0]
-        # Afficher le paramètre seulement pour les types qui en ont besoin
-        if (groupe in [2, 8, 15, 62, 17] and t in [7, 8, 9, 10, 13, 14]) or (groupe == 4):
-            p = param if param not in [None, -1.0, ""] else None
-            if p:
-                return f"{label} ({p}) [{cote}]"
-            else:
+        # N'afficher le paramètre que s'il n'est pas déjà dans le libellé
+        if param not in [None, -1.0, ""]:
+            param_str = str(param)
+            # Si le paramètre est déjà dans le label, ne pas le rajouter
+            if param_str in label:
                 return f"{label} [{cote}]"
-        else:
-            return f"{label} [{cote}]"
+        return f"{label} [{cote}]"
     return "Aucune cote alternative dans la plage (1.399 à 3)"
 
 def parse_meteo(match: dict) -> Tuple[str, str]:
@@ -477,6 +475,18 @@ def match_details(match_id):
                 .pred-section:hover {{
                     box-shadow: 0 4px 16px #90caf9;
                 }}
+                .alt-prediction-section {{
+                    border: 3px solid #ff1744;
+                    background: #ffebee;
+                    border-radius: 10px;
+                    padding: 12px 10px;
+                    margin: 18px 0 18px 0;
+                    font-size: 1.08em;
+                    font-weight: bold;
+                    color: #b71c1c;
+                    box-shadow: 0 0 12px 2px #ff1744, 0 2px 8px #ffcdd2;
+                    display: inline-block;
+                }}
             </style>
         </head><body>
             <div class="container">
@@ -491,7 +501,7 @@ def match_details(match_id):
                         {''.join(f'<tr><td>{{p["resultat"]}}</td><td>{{p["param"]}}</td><td>{{p["cote"]}}</td></tr>' for p in all_predictions)}
                     </table>
                 </div>
-                <p id="alt-prediction"><b>Prédiction du bot (alternatif) :</b> {alt_prediction}</p>
+                <div id="alt-prediction" class="alt-prediction-section"><b>Prédiction du bot (alternatif) :</b> {alt_prediction}</div>
                 <p id="explication"><b>Explication :</b> {explication}</p>
                 <h3>Statistiques principales</h3>
                 <table class="stats-table">
