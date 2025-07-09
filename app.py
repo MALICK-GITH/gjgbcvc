@@ -485,7 +485,32 @@ def match_details(match_id):
                     font-weight: bold;
                     color: #b71c1c;
                     box-shadow: 0 0 12px 2px #ff1744, 0 2px 8px #ffcdd2;
-                    display: inline-block;
+                    display: block;
+                }}
+                .alt-prediction-table-section {{
+                    border: 3px solid #ff1744;
+                    background: #fff3f3;
+                    border-radius: 10px;
+                    padding: 16px 10px 10px 10px;
+                    margin: 18px 0 18px 0;
+                    box-shadow: 0 0 12px 2px #ff1744, 0 2px 8px #ffcdd2;
+                }}
+                .alt-prediction-table {{
+                    width: 98%;
+                    margin: 10px auto 0 auto;
+                    border-collapse: collapse;
+                    background: #fff;
+                }}
+                .alt-prediction-table th, .alt-prediction-table td {{
+                    border: 1.5px solid #ff1744;
+                    padding: 7px 6px;
+                    text-align: center;
+                }}
+                .alt-prediction-best {{
+                    background: #ff1744;
+                    color: #fff;
+                    font-weight: bold;
+                    font-size: 1.08em;
                 }}
             </style>
         </head><body>
@@ -494,6 +519,14 @@ def match_details(match_id):
                 <h2 id="teams">{team1} vs {team2}</h2>
                 <p id="infos"><b>Ligue :</b> {league_name} ({league}) | <b>Pays :</b> {league_country} | <b>Sport :</b> {sport_name}</p>
                 <p id="score"><b>Score :</b> {score1} - {score2}</p>
+                <div class="alt-prediction-table-section">
+                    <div class="alt-prediction-section" id="alt-prediction"><b>Meilleure prédiction alternative :</b> {alt_prediction}</div>
+                    <h4 style="margin-top:10px;">Tableau des alternatives (Handicap & Over/Under, cotes 1.399 à 3)</h4>
+                    <table class="alt-prediction-table" id="alt-prediction-table">
+                        <tr><th>Type de pari</th><th>Cote</th><th>Probabilité estimée</th></tr>
+                        {''.join(f'<tr class="alt-prediction-best">' if i==0 else '<tr>' + f'<td>{{p["resultat"]}}</td><td>{{p["cote"]}}</td><td>{{round(1/float(p["cote"]),3) if p["cote"] else "-"}}</td></tr>' for i,p in enumerate([pp for pp in all_predictions if any(x in pp["resultat"].lower() for x in ["handicap", "plus de", "moins de", "asiatique"])]) )}
+                    </table>
+                </div>
                 <div id="predictions" class="pred-section">
                     <h3>Prédictions principales et alternatives (cotes 1.399 à 3)</h3>
                     <table class="pred-table" id="pred-table">
@@ -501,7 +534,6 @@ def match_details(match_id):
                         {''.join(f'<tr><td>{{p["resultat"]}}</td><td>{{p["param"]}}</td><td>{{p["cote"]}}</td></tr>' for p in all_predictions)}
                     </table>
                 </div>
-                <div id="alt-prediction" class="alt-prediction-section"><b>Prédiction du bot (alternatif) :</b> {alt_prediction}</div>
                 <p id="explication"><b>Explication :</b> {explication}</p>
                 <h3>Statistiques principales</h3>
                 <table class="stats-table">
@@ -528,7 +560,19 @@ def match_details(match_id):
                                 predRows += `<tr><td>${{p.resultat}}</td><td>${{p.param}}</td><td>${{p.cote}}</td></tr>`;
                             }});
                             predTable.innerHTML = predRows;
-                            document.getElementById('alt-prediction').innerHTML = `<b>Prédiction du bot (alternatif) :</b> ${{data.alt_prediction}}`;
+                            document.getElementById('alt-prediction').innerHTML = `<b>Meilleure prédiction alternative :</b> ${{data.alt_prediction}}`;
+                            document.getElementById('alt-prediction-table').innerHTML = ''; // Clear existing table
+                            data.all_predictions.forEach(function(p) {{
+                                if (p.resultat.toLowerCase().includes('handicap') || p.resultat.toLowerCase().includes('plus de') || p.resultat.toLowerCase().includes('moins de') || p.resultat.toLowerCase().includes('asiatique')) {
+                                    let row = '<tr>';
+                                    if (p.resultat.toLowerCase().includes('handicap')) {
+                                        row += `<td>${{p.resultat}}</td><td>${{p.cote}}</td><td>${{round(1/float(p.cote),3) if p.cote else "-"}}</td></tr>`;
+                                    } else {
+                                        row += `<td>${{p.resultat}}</td><td>${{p.cote}}</td><td>${{round(1/float(p.cote),3) if p.cote else "-"}}</td></tr>`;
+                                    }
+                                    predTable.insertAdjacentHTML('beforeend', row);
+                                }
+                            }});
                             document.getElementById('explication').innerHTML = `<b>Explication :</b> ${{data.explication}}`;
                             // Update stats table
                             const statsTbody = document.getElementById('stats-tbody');
