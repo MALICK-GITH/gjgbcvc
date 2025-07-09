@@ -124,8 +124,34 @@ def traduire_pari(groupe, t, param, team1, team2):
             return f"Handicap {team1} +{param}"
         elif t == 10:
             return f"Handicap {team2} -{param}"
+        elif t == 11:
+            return f"Les deux équipes marquent : Oui"
+        elif t == 12:
+            return f"Les deux équipes marquent : Non"
+    # Double chance
+    if groupe == 3:
+        if t == 13:
+            return f"Double chance : {team1} ou Nul"
+        elif t == 14:
+            return f"Double chance : {team2} ou Nul"
+        elif t == 15:
+            return f"Double chance : {team1} ou {team2}"
+    # Score exact
+    if groupe == 4:
+        return f"Score exact : {param}"
+    # Mi-temps/fin de match
+    if groupe == 5:
+        if t == 16:
+            return f"{team1} mène à la mi-temps et gagne"
+        elif t == 17:
+            return f"{team2} mène à la mi-temps et gagne"
+        elif t == 18:
+            return f"Nul à la mi-temps, {team1} gagne"
+        elif t == 19:
+            return f"Nul à la mi-temps, {team2} gagne"
     # Autres types courants (à compléter selon besoins)
-    return f"Type {t} (groupe {groupe})"
+    # Si inconnu, afficher un libellé explicite
+    return f"Type inconnu (T={t}, G={groupe})"
 
 def get_all_predictions(match: dict, team1: str, team2: str) -> list:
     predictions = []
