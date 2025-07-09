@@ -465,7 +465,7 @@ def match_details(match_id):
                 .back-btn {{ margin-bottom: 20px; display: inline-block; }}
                 .pred-table {{ width: 90%; margin: 20px auto 0 auto; border-collapse: collapse; }}
                 .pred-table th, .pred-table td {{ border: 1px solid #aaa; padding: 6px; text-align: center; }}
-                .pred-section {
+                .pred-section {{
                     border: 3px solid #2196f3;
                     background: #e3f2fd;
                     border-radius: 10px;
@@ -473,10 +473,10 @@ def match_details(match_id):
                     margin: 25px 0 25px 0;
                     box-shadow: 0 2px 8px #b3e5fc;
                     transition: box-shadow 0.2s;
-                }
-                .pred-section:hover {
+                }}
+                .pred-section:hover {{
                     box-shadow: 0 4px 16px #90caf9;
-                }
+                }}
             </style>
         </head><body>
             <div class="container">
