@@ -553,6 +553,7 @@ def match_details(match_id):
                             document.getElementById('teams').textContent = data.team1 + ' vs ' + data.team2;
                             document.getElementById('infos').innerHTML = `<b>Ligue :</b> ${{data.league_name}} (${{data.league}}) | <b>Pays :</b> ${{data.league_country}} | <b>Sport :</b> ${{data.sport_name}}`;
                             document.getElementById('score').innerHTML = `<b>Score :</b> ${{data.score1}} - ${{data.score2}}`;
+
                             // Prédictions principales et alternatives
                             const predTable = document.getElementById('pred-table');
                             let predRows = '<tr><th>Pari/prédiction</th><th>Paramètre</th><th>Cote</th></tr>';
@@ -560,20 +561,24 @@ def match_details(match_id):
                                 predRows += `<tr><td>${{p.resultat}}</td><td>${{p.param}}</td><td>${{p.cote}}</td></tr>`;
                             }});
                             predTable.innerHTML = predRows;
-                            document.getElementById('alt-prediction').innerHTML = `<b>Meilleure prédiction alternative :</b> ${{data.alt_prediction}}`;
-                            document.getElementById('alt-prediction-table').innerHTML = ''; // Clear existing table
+
+                            // Tableau alternatives (Handicap & Over/Under)
+                            const altTable = document.getElementById('alt-prediction-table');
+                            let altRows = '<tr><th>Type de pari</th><th>Cote</th><th>Probabilité estimée</th></tr>';
+                            let first = true;
                             data.all_predictions.forEach(function(p) {{
-                                if (p.resultat.toLowerCase().includes('handicap') || p.resultat.toLowerCase().includes('plus de') || p.resultat.toLowerCase().includes('moins de') || p.resultat.toLowerCase().includes('asiatique')) {
-                                    let row = '<tr>';
-                                    if (p.resultat.toLowerCase().includes('handicap')) {
-                                        row += `<td>${{p.resultat}}</td><td>${{p.cote}}</td><td>${{round(1/float(p.cote),3) if p.get("cote") else "-"}}</td></tr>`;
-                                    } else {
-                                        row += `<td>${{p.resultat}}</td><td>${{p.cote}}</td><td>${{round(1/float(p.cote),3) if p.get("cote") else "-"}}</td></tr>`;
-                                    }
-                                    predTable.insertAdjacentHTML('beforeend', row);
-                                }
+                                if (p.resultat.toLowerCase().includes('handicap') || p.resultat.toLowerCase().includes('plus de') || p.resultat.toLowerCase().includes('moins de') || p.resultat.toLowerCase().includes('asiatique')) {{
+                                    let proba = p.cote ? (1/parseFloat(p.cote)).toFixed(3) : '-';
+                                    let rowClass = first ? ' class="alt-prediction-best"' : '';
+                                    altRows += `<tr${{rowClass}}><td>${{p.resultat}}</td><td>${{p.cote}}</td><td>${{proba}}</td></tr>`;
+                                    first = false;
+                                }}
                             }});
+                            altTable.innerHTML = altRows;
+
+                            document.getElementById('alt-prediction').innerHTML = `<b>Meilleure prédiction alternative :</b> ${{data.alt_prediction}}`;
                             document.getElementById('explication').innerHTML = `<b>Explication :</b> ${{data.explication}}`;
+
                             // Update stats table
                             const statsTbody = document.getElementById('stats-tbody');
                             statsTbody.innerHTML = '';
@@ -586,16 +591,16 @@ def match_details(match_id):
                             const data1 = data.stats.map(s => parseFloat(s.s1.replace(',', '.')) || 0);
                             const data2 = data.stats.map(s => parseFloat(s.s2.replace(',', '.')) || 0);
                             window.statsChart = new Chart(document.getElementById('statsChart'), {{
-                    type: 'bar',
-                    data: {{
-                        labels: labels,
-                        datasets: [
+                                type: 'bar',
+                                data: {{
+                                    labels: labels,
+                                    datasets: [
                                         {{ label: data.team1, data: data1, backgroundColor: 'rgba(44,62,80,0.7)' }},
                                         {{ label: data.team2, data: data2, backgroundColor: 'rgba(39,174,96,0.7)' }}
-                        ]
-                    }},
-                    options: {{ responsive: true, plugins: {{ legend: {{ position: 'top' }} }} }}
-                }});
+                                    ]
+                                }},
+                                options: {{ responsive: true, plugins: {{ legend: {{ position: 'top' }} }} }}
+                            }});
                         }});
                 }}
                 setInterval(updateMatchDetails, 5000); // 5 secondes
