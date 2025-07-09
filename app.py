@@ -100,10 +100,9 @@ def get_prediction(match: dict, team1: str, team2: str) -> str:
     return "–"
 
 def traduire_pari(groupe, t, param, team1, team2):
-    # Utilitaire pour afficher le paramètre proprement
     def param_str(p):
         if p in [None, -1.0, ""]:
-            return "?"
+            return None
         try:
             return str(float(p)).rstrip('0').rstrip('.') if '.' in str(p) else str(p)
         except:
@@ -122,25 +121,37 @@ def traduire_pari(groupe, t, param, team1, team2):
             return f"Double chance virtuel : {team2} ou Nul"
         elif t == 6:
             return f"Double chance virtuel : {team1} ou {team2}"
+    # Double chance virtuel (groupe 8, T=4 ou 6)
+    if groupe == 8:
+        if t == 4:
+            return f"Double chance virtuel : {team1} ou Nul"
+        elif t == 6:
+            return f"Double chance virtuel : {team1} ou {team2}"
     # Over/Under, Handicap, etc. virtuels
     if groupe in [2, 8, 15, 62]:
         if t == 7:
-            return f"Plus de {param_str(param)} buts (simulation)"
+            p = param_str(param)
+            return f"Plus de {p if p else '?'} buts (simulation)"
         elif t == 8:
-            return f"Moins de {param_str(param)} buts (simulation)"
+            p = param_str(param)
+            return f"Moins de {p if p else '?'} buts (simulation)"
         elif t == 9:
-            return f"Handicap virtuel {team1} +{param_str(param)}"
+            p = param_str(param)
+            return f"Handicap virtuel {team1} +{p if p else '?'}"
         elif t == 10:
-            return f"Handicap virtuel {team2} -{param_str(param)}"
+            p = param_str(param)
+            return f"Handicap virtuel {team2} -{p if p else '?'}"
         elif t == 11:
             return f"Les deux équipes marquent (virtuel) : Oui"
         elif t == 12:
             return f"Les deux équipes marquent (virtuel) : Non"
         elif t == 13 or t == 14:
-            return f"Handicap asiatique virtuel {param_str(param)}"
+            p = param_str(param)
+            return f"Handicap asiatique virtuel {p if p else '?'}"
     # Score exact virtuel
     if groupe == 4:
-        return f"Score exact virtuel : {param_str(param)}"
+        p = param_str(param)
+        return f"Score exact virtuel : {p if p else '?'}"
     # Mi-temps/fin de match virtuel
     if groupe == 5:
         if t == 16:
@@ -154,9 +165,11 @@ def traduire_pari(groupe, t, param, team1, team2):
     # Groupes spéciaux virtuels
     if groupe == 17:
         if t == 9:
-            return f"Handicap virtuel {team1} +{param_str(param)}"
+            p = param_str(param)
+            return f"Handicap virtuel {team1} +{p if p else '?'}"
         elif t == 10:
-            return f"Handicap virtuel {team2} -{param_str(param)}"
+            p = param_str(param)
+            return f"Handicap virtuel {team2} -{p if p else '?'}"
     if groupe == 19:
         if t == 180:
             return f"Pari spécial virtuel (T=180, G=19)"
@@ -190,6 +203,8 @@ def get_all_predictions(match: dict, team1: str, team2: str) -> list:
     predictions.sort(key=lambda x: x["cote"])
     return predictions
 
+# Adapter l'affichage de la prédiction du bot (get_alternative_prediction) pour n'afficher le paramètre que s'il existe et est pertinent
+
 def get_alternative_prediction(match: dict, team1: str, team2: str) -> str:
     meilleures = []
     for ae in match.get("AE", []):
@@ -200,12 +215,17 @@ def get_alternative_prediction(match: dict, team1: str, team2: str) -> str:
                 t = o.get("T")
                 param = o.get("P") if "P" in o else None
                 label = traduire_pari(groupe, t, param, team1, team2)
-                meilleures.append((cote, label, param))
+                meilleures.append((cote, label, param, groupe, t))
     if meilleures:
         meilleures.sort(key=lambda x: x[0])
-        cote, label, param = meilleures[0]
-        if param not in [None, -1.0, ""]:
-            return f"{label} ({param}) [{cote}]"
+        cote, label, param, groupe, t = meilleures[0]
+        # Afficher le paramètre seulement pour les types qui en ont besoin
+        if (groupe in [2, 8, 15, 62, 17] and t in [7, 8, 9, 10, 13, 14]) or (groupe == 4):
+            p = param if param not in [None, -1.0, ""] else None
+            if p:
+                return f"{label} ({p}) [{cote}]"
+            else:
+                return f"{label} [{cote}]"
         else:
             return f"{label} [{cote}]"
     return "Aucune cote alternative dans la plage (1.399 à 3)"
@@ -445,6 +465,18 @@ def match_details(match_id):
                 .back-btn {{ margin-bottom: 20px; display: inline-block; }}
                 .pred-table {{ width: 90%; margin: 20px auto 0 auto; border-collapse: collapse; }}
                 .pred-table th, .pred-table td {{ border: 1px solid #aaa; padding: 6px; text-align: center; }}
+                .pred-section {
+                    border: 3px solid #2196f3;
+                    background: #e3f2fd;
+                    border-radius: 10px;
+                    padding: 18px 12px 12px 12px;
+                    margin: 25px 0 25px 0;
+                    box-shadow: 0 2px 8px #b3e5fc;
+                    transition: box-shadow 0.2s;
+                }
+                .pred-section:hover {
+                    box-shadow: 0 4px 16px #90caf9;
+                }
             </style>
         </head><body>
             <div class="container">
@@ -452,7 +484,7 @@ def match_details(match_id):
                 <h2 id="teams">{team1} vs {team2}</h2>
                 <p id="infos"><b>Ligue :</b> {league_name} ({league}) | <b>Pays :</b> {league_country} | <b>Sport :</b> {sport_name}</p>
                 <p id="score"><b>Score :</b> {score1} - {score2}</p>
-                <div id="predictions">
+                <div id="predictions" class="pred-section">
                     <h3>Prédictions principales et alternatives (cotes 1.399 à 3)</h3>
                     <table class="pred-table" id="pred-table">
                         <tr><th>Pari/prédiction</th><th>Paramètre</th><th>Cote</th></tr>
