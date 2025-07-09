@@ -100,58 +100,70 @@ def get_prediction(match: dict, team1: str, team2: str) -> str:
     return "–"
 
 def traduire_pari(groupe, t, param, team1, team2):
-    # Paris principaux 1X2
+    # Utilitaire pour afficher le paramètre proprement
+    def param_str(p):
+        if p in [None, -1.0, ""]:
+            return "?"
+        try:
+            return str(float(p)).rstrip('0').rstrip('.') if '.' in str(p) else str(p)
+        except:
+            return str(p)
+    # Paris principaux 1X2 virtuels
     if groupe == 1:
         if t == 1:
-            return f"Victoire {team1}"
+            return f"Victoire FIFA {team1} (virtuel)"
         elif t == 2:
-            return f"Victoire {team2}"
+            return f"Victoire FIFA {team2} (virtuel)"
         elif t == 3:
-            return "Match nul"
+            return "Match nul (virtuel)"
         elif t == 4:
-            return f"Victoire {team1} ou Nul"
+            return f"Double chance virtuel : {team1} ou Nul"
         elif t == 5:
-            return f"Victoire {team2} ou Nul"
+            return f"Double chance virtuel : {team2} ou Nul"
         elif t == 6:
-            return f"Victoire {team1} ou {team2}"
-    # Over/Under
-    if groupe == 2:
+            return f"Double chance virtuel : {team1} ou {team2}"
+    # Over/Under, Handicap, etc. virtuels
+    if groupe in [2, 8, 15, 62]:
         if t == 7:
-            return f"Plus de {param} buts"
+            return f"Plus de {param_str(param)} buts (simulation)"
         elif t == 8:
-            return f"Moins de {param} buts"
+            return f"Moins de {param_str(param)} buts (simulation)"
         elif t == 9:
-            return f"Handicap {team1} +{param}"
+            return f"Handicap virtuel {team1} +{param_str(param)}"
         elif t == 10:
-            return f"Handicap {team2} -{param}"
+            return f"Handicap virtuel {team2} -{param_str(param)}"
         elif t == 11:
-            return f"Les deux équipes marquent : Oui"
+            return f"Les deux équipes marquent (virtuel) : Oui"
         elif t == 12:
-            return f"Les deux équipes marquent : Non"
-    # Double chance
-    if groupe == 3:
-        if t == 13:
-            return f"Double chance : {team1} ou Nul"
-        elif t == 14:
-            return f"Double chance : {team2} ou Nul"
-        elif t == 15:
-            return f"Double chance : {team1} ou {team2}"
-    # Score exact
+            return f"Les deux équipes marquent (virtuel) : Non"
+        elif t == 13 or t == 14:
+            return f"Handicap asiatique virtuel {param_str(param)}"
+    # Score exact virtuel
     if groupe == 4:
-        return f"Score exact : {param}"
-    # Mi-temps/fin de match
+        return f"Score exact virtuel : {param_str(param)}"
+    # Mi-temps/fin de match virtuel
     if groupe == 5:
         if t == 16:
-            return f"{team1} mène à la mi-temps et gagne"
+            return f"{team1} mène à la mi-temps et gagne (virtuel)"
         elif t == 17:
-            return f"{team2} mène à la mi-temps et gagne"
+            return f"{team2} mène à la mi-temps et gagne (virtuel)"
         elif t == 18:
-            return f"Nul à la mi-temps, {team1} gagne"
+            return f"Nul à la mi-temps, {team1} gagne (virtuel)"
         elif t == 19:
-            return f"Nul à la mi-temps, {team2} gagne"
-    # Autres types courants (à compléter selon besoins)
-    # Si inconnu, afficher un libellé explicite
-    return f"Type inconnu (T={t}, G={groupe})"
+            return f"Nul à la mi-temps, {team2} gagne (virtuel)"
+    # Groupes spéciaux virtuels
+    if groupe == 17:
+        if t == 9:
+            return f"Handicap virtuel {team1} +{param_str(param)}"
+        elif t == 10:
+            return f"Handicap virtuel {team2} -{param_str(param)}"
+    if groupe == 19:
+        if t == 180:
+            return f"Pari spécial virtuel (T=180, G=19)"
+        elif t == 181:
+            return f"Pari spécial virtuel (T=181, G=19)"
+    # Cas générique pour tout type inconnu
+    return f"Pari virtuel non reconnu (T={t}, G={groupe})"
 
 def get_all_predictions(match: dict, team1: str, team2: str) -> list:
     predictions = []
@@ -367,7 +379,7 @@ def api_match_details(match_id):
                 s1 = stat.get("S1", "0")
                 s2 = stat.get("S2", "0")
                 stats.append({"nom": nom, "s1": s1, "s2": s2})
-        explication = "Toutes les opportunités de pari (alternatives uniquement) comprises entre 1.399 et 3 sont listées ci-dessous, avec leur libellé explicite."
+        explication = "Toutes les opportunités de pari virtuel (alternatives uniquement) comprises entre 1.399 et 3 sont listées ci-dessous, avec leur libellé explicite. Les résultats sont issus de simulations virtuelles (FIFA, NBA2K, etc.)."
         all_predictions = get_all_predictions(match, team1, team2)
         alt_prediction = get_alternative_prediction(match, team1, team2)
         return jsonify({
@@ -414,7 +426,7 @@ def match_details(match_id):
                 s1 = stat.get("S1", "0")
                 s2 = stat.get("S2", "0")
                 stats.append({"nom": nom, "s1": s1, "s2": s2})
-        explication = "Toutes les opportunités de pari (alternatives uniquement) comprises entre 1.399 et 3 sont listées ci-dessous, avec leur libellé explicite."
+        explication = "Toutes les opportunités de pari virtuel (alternatives uniquement) comprises entre 1.399 et 3 sont listées ci-dessous, avec leur libellé explicite. Les résultats sont issus de simulations virtuelles (FIFA, NBA2K, etc.)."
         all_predictions = get_all_predictions(match, team1, team2)
         alt_prediction = get_alternative_prediction(match, team1, team2)
         return f'''
@@ -500,7 +512,7 @@ def match_details(match_id):
                             }});
                         }});
                 }}
-                setInterval(updateMatchDetails, 20000); // 20 secondes
+                setInterval(updateMatchDetails, 5000); // 5 secondes
             </script>
         </body></html>
         '''
